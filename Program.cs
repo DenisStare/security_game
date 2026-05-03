@@ -1,65 +1,7 @@
 ﻿using System.Text.RegularExpressions;
 using System.Text.Json;
-using System.Text;
 
-// Returns error
-bool LoseStamina(ref short stamina, short to_lose)
-{
-    short last_stamina = stamina;
-    stamina -= to_lose;
-
-    if (stamina < 0)
-    {
-        stamina = last_stamina;
-        return true;
-    }
-    return false;
-}
-
-// Returns error
-bool AddStamina(ref short stamina, short to_add)
-{
-    short last_stamina = stamina;
-    stamina += to_add;
-    if (stamina > 100)
-    {
-        stamina = last_stamina;
-        return true;
-    }
-    return false;
-}
-
-void SaveGame(string file_name, string file_dir, dynamic save_data)
-{
-    if (!Directory.Exists(file_dir))
-    {
-        Directory.CreateDirectory(file_dir);
-    }
-
-    string file_path = $"{file_dir}/{file_name}";
-
-    StreamWriter save_file_writer = new StreamWriter(file_path);
-
-    // For formathing 
-    var options = new JsonSerializerOptions { WriteIndented = true };
-    string json_data = JsonSerializer.Serialize(save_data, options);
-
-    save_file_writer.Write(json_data);
-
-    save_file_writer.Close();
-}
-
-void LoadSave(string file_path, ref short stamina, ref bool has_key)
-{
-    StreamReader save_data_reader = new StreamReader(file_path);
-    string json_data = save_data_reader.ReadToEnd();
-
-    JsonElement json_data_element = JsonSerializer.Deserialize<JsonElement>(json_data);
-    
-    stamina = json_data_element.GetProperty("stamina").GetInt16();
-    has_key = json_data_element.GetProperty("hasKey").GetBoolean();
-}
-
+using SaveManagerJsonKeys = (string stamina, string items);
 
 // 
 // Settings
@@ -67,22 +9,20 @@ void LoadSave(string file_path, ref short stamina, ref bool has_key)
 
 const string save_dir = "./Saves";
 const string prompt = "cmd> ";
-const bool dev_mode = false;
+const bool dev_mode = true;
 
-short stamina = 100;
-bool has_key = false;
+PlayerProprietes player_proprietes = new PlayerProprietes(100, false);
+SaveManager save_manager = new SaveManager(player_proprietes, null);
 
 if (args.Length == 1)
 {
     string saved_file = args[0];
     string file_path = $"{save_dir}/{saved_file}";
-    if (!File.Exists(file_path))
+    if (!save_manager.LoadSave(file_path))
     {
         Console.WriteLine($"The save file '{saved_file}' dosen't exist in '{save_dir}' directory");
         goto game_start;
     }
-
-    LoadSave(file_path, ref stamina, ref has_key);
 }
 
 
@@ -116,7 +56,7 @@ while (true)
     }
     else if (user_input == "search" )
     {
-        if (has_key)
+        if (player_proprietes.HasItem())
         {
             Console.WriteLine("You have the key.");
             continue;
@@ -125,19 +65,19 @@ while (true)
         Console.WriteLine("You see something in a bush.");
         Console.WriteLine("You look in the bush and find the key.");
 
-        has_key = true;
+        player_proprietes.PickUpItem();
         Console.WriteLine("You put the key in your pocket.");
     }
     else if (user_input == "open gate")
     {
         Console.WriteLine("You try to open the gate.");
-        if (!has_key)
+        if (!player_proprietes.HasItems())
         {
             Console.WriteLine("You don't have the key.");
             Console.WriteLine("But you try anyway.");
             Console.WriteLine("The door won't open.");
 
-            if (LoseStamina(ref stamina, 20))
+            if (player_proprietes.LoseStamina(20))
             {
                 Console.WriteLine("You have 0 stamina.");
                 Console.WriteLine("You die!");
@@ -147,12 +87,12 @@ while (true)
             Console.WriteLine("You lose 20% of your stamina.");
             continue;
         }
-        else if (stamina != 100)
+        else if (player_proprietes.stamina != 100)
         {
             Console.WriteLine("You dont have stamina.");
             Console.WriteLine("But you try anyway");
 
-            if (LoseStamina(ref stamina, 15))
+            if (player_proprietes.LoseStamina(15))
             {
                 Console.WriteLine("You have 0 stamina.");
                 Console.WriteLine("You die!");
@@ -171,7 +111,7 @@ while (true)
     else if (user_input == "rest")
     {
         Console.WriteLine("You rest.");
-        if (AddStamina(ref stamina, 20))
+        if (player_proprietes.AddStamina(20))
         {
             Console.WriteLine("You have 100% stamina.");
             continue;
@@ -186,11 +126,11 @@ while (true)
         // Save date
         var save_data = new
         {
-            stamina = stamina,
-            hasKey = has_key
+            stamina = player_proprietes.stamina,
+            hasKey = player_proprietes.has_key,
         };
 
-        SaveGame(file_name, save_dir, save_data);
+        save_manager.SaveGame(file_name, save_dir);
         Console.WriteLine("Data Saved..");
     }
     else if (Regex.IsMatch(user_input, @"^load \w+\.json$"))
@@ -199,13 +139,12 @@ while (true)
         string file_name = user_input.Split(" ")[1];
         string file_path = $"{save_dir}/{file_name}";
 
-        if (!File.Exists(file_path))
+        if (!save_manager.LoadSave(file_path))
         {
-            Console.WriteLine($"The save file '{file_name}' dosen't exist in '{save_dir}' directory");
+            Console.WriteLine($"The file '{file_name}' dosen't exist in '{save_dir}' directory");
             continue;
         }
 
-        LoadSave(file_path, ref stamina, ref has_key);
         Console.WriteLine("Data Loaded..");
     }
     else if (user_input == "stats")
@@ -213,8 +152,8 @@ while (true)
         if (dev_mode)
         {
             Console.WriteLine("Stats: ");
-            Console.WriteLine($"\tStamina: {stamina}%");
-            Console.WriteLine($"\tHas Key: {has_key}");
+            Console.WriteLine($"\tStamina: {player_proprietes.stamina}%");
+            Console.WriteLine($"\tHas Key: {player_proprietes.has_key}");
         }
         else
         {
@@ -223,3 +162,138 @@ while (true)
     }
 }
 
+
+class PlayerProprietes
+{
+    short _stamina;
+    bool _has_key;
+
+    public short stamina
+    {
+        get
+        {
+            return _stamina;
+        }
+        set
+        {
+            _stamina = value;
+        }
+    }
+
+    public bool has_key
+    {
+        get
+        {
+            return _has_key;
+        }
+        set
+        {
+            _has_key = value;
+        }
+    }
+
+    public PlayerProprietes(short stamina, bool has_key)
+    {
+        this._stamina = stamina;
+        this._has_key = has_key;
+    }
+
+    public bool LoseStamina(short to_lose)
+    {
+        short last_stamina = this._stamina;
+        _stamina -= to_lose;
+
+        if (_stamina <= 0)
+        {
+            _stamina = last_stamina;
+            return true;
+        }
+        return false;
+    }
+
+    public bool AddStamina(short to_add)
+    {
+        short last_stamina = _stamina;
+        _stamina += to_add;
+        if (_stamina > 100)
+        {
+            _stamina = last_stamina;
+            return true;
+        }
+        return false;
+    }
+
+    public void PickUpItem() // for now a key
+    {
+        _has_key = true;
+    }
+
+    public bool HasItem() // Todo: for one item
+    {
+        return _has_key;
+    }
+
+    public bool HasItems() // for multiple item
+    {
+        return _has_key;
+    }
+
+};
+
+
+class SaveManager
+{
+    PlayerProprietes _save_data;
+    SaveManagerJsonKeys _json_keys = ("stamina", "has_key");
+
+    public SaveManager(PlayerProprietes player_data, SaveManagerJsonKeys? json_keys)
+    {
+        this._save_data = player_data;
+        if (json_keys.HasValue)
+        {
+            this._json_keys = json_keys.Value;
+        }
+    }
+    public void SaveGame(string file_name, string file_dir)
+    {
+        if (!Directory.Exists(file_dir))
+        {
+            Directory.CreateDirectory(file_dir);
+        }
+
+        string file_path = $"{file_dir}/{file_name}";
+
+        // For formathing 
+        var options = new JsonSerializerOptions { WriteIndented = true };
+        string json_data = JsonSerializer.Serialize(this._save_data, options);
+
+        File.WriteAllText(file_path, json_data);
+    }
+
+    public bool LoadSave(string file_path)
+    {
+        if (!File.Exists(file_path))
+        {
+            return false;
+        }
+        string json_data = File.ReadAllText(file_path);
+
+        JsonElement json_data_element = JsonSerializer.Deserialize<JsonElement>(json_data);
+
+
+        PlayerProprietes tmp = new PlayerProprietes(0, false);
+        try 
+        {
+            tmp.stamina = json_data_element.GetProperty(_json_keys.stamina).GetInt16();
+            tmp.has_key = json_data_element.GetProperty(_json_keys.items).GetBoolean();
+        } catch (KeyNotFoundException e)
+        {
+            Console.WriteLine($"Save file is invalid because: {e.Data}");
+            return false;
+        }
+
+        _save_data.stamina = tmp.stamina;
+        _save_data.has_key = tmp.has_key;
+        return true;
+    }
+}
