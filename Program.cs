@@ -9,7 +9,7 @@ using SaveManagerJsonKeys = (string stamina, string items);
 
 const string save_dir = "./Saves";
 const string prompt = "cmd> ";
-const bool dev_mode = true;
+const bool dev_mode = false;
 
 PlayerProprietes player_proprietes = new PlayerProprietes(100, false);
 SaveManager save_manager = new SaveManager(player_proprietes, null);
