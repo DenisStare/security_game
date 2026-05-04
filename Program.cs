@@ -9,8 +9,8 @@ const string save_dir = "./Saves";
 const string prompt = "cmd> ";
 const bool dev_mode = false;
 
-PlayerProprietes player_proprietes = new PlayerProprietes();
-SaveManager save_manager = new SaveManager(player_proprietes, new JsonSerializerOptions{ WriteIndented = true });
+PlayerStats player = new PlayerStats();
+SaveManager save_manager = new SaveManager(player, new JsonSerializerOptions{ WriteIndented = true });
 
 if (args.Length == 1)
 {
@@ -55,7 +55,7 @@ while (true)
     }
     else if (user_input == "search" )
     {
-        if (player_proprietes.HasItem("key"))
+        if (player.HasItem("key"))
         {
             Console.WriteLine("You have the key.");
             continue;
@@ -64,29 +64,29 @@ while (true)
         Console.WriteLine("You see something in a bush.");
         Console.WriteLine("You look in the bush and find the key.");
 
-        player_proprietes.PickUpItem("hey");
+        player.PickUpItem("hey");
         Console.WriteLine("You put the key in your pocket.");
     }
     else if (user_input == "open gate")
     {
         Console.WriteLine("You try to open the gate.");
-        if (!player_proprietes.HasItem("key"))
+        if (!player.HasItem("key"))
         {
             Console.WriteLine("You don't have the key.");
             Console.WriteLine("But you try anyway.");
             Console.WriteLine("The door won't open.");
 
-            player_proprietes.LoseStamina(20);
+            player.LoseStamina(20);
 
             Console.WriteLine("You lose 20% of your stamina.");
             continue;
         }
-        else if (player_proprietes.stamina != 100)
+        else if (player.stamina != 100)
         {
             Console.WriteLine("You dont have stamina.");
             Console.WriteLine("But you try anyway");
 
-            player_proprietes.LoseStamina(15);
+            player.LoseStamina(15);
 
             Console.WriteLine("You lose 15% stamina.");
             continue;
@@ -100,13 +100,13 @@ while (true)
     else if (user_input == "rest")
     {
         Console.WriteLine("You rest.");
-        if (player_proprietes.stamina == 100)
+        if (player.stamina == 100)
         {
             Console.WriteLine("You have 100% stamina");
             continue;
         }
 
-        player_proprietes.AddStamina(20);
+        player.AddStamina(20);
 
         Console.WriteLine("You recover 20% stamina.");
     }
@@ -137,8 +137,8 @@ while (true)
         if (dev_mode)
         {
             Console.WriteLine("Stats: ");
-            Console.WriteLine($"\tStamina: {player_proprietes.stamina}%");
-            Console.WriteLine($"\tHas Key: {player_proprietes.items}");
+            Console.WriteLine($"\tStamina: {player.stamina}%");
+            Console.WriteLine($"\tHas Key: {player.items}");
         }
         else
         {
@@ -148,7 +148,7 @@ while (true)
 }
 
 
-class PlayerProprietes
+class PlayerStats
 {
     public short stamina = 100;
     public List<string> items = new();
@@ -207,15 +207,17 @@ class PlayerProprietes
 
 class SaveManager
 {
-    PlayerProprietes _save_data;
+    PlayerStats _save_data;
     JsonSerializerOptions _data_options;
 
 
-    public SaveManager(PlayerProprietes player_data, JsonSerializerOptions? data_options)
+    public SaveManager(PlayerStats player_data, JsonSerializerOptions? data_options)
     {
         _save_data = player_data;
         if (data_options != null)
-            _data_options = data_options!;
+            _data_options = data_options;
+        else
+            _data_options = new JsonSerializerOptions();
     }
 
     public void SaveGame(string file_name, string file_dir)
@@ -226,10 +228,6 @@ class SaveManager
         }
 
         string file_path = $"{file_dir}/{file_name}";
-
-        // For formathing 
-        if (_data_options == null)
-            _data_options = new JsonSerializerOptions();
 
         string json_data = JsonSerializer.Serialize(_save_data, _data_options);
 
@@ -243,11 +241,8 @@ class SaveManager
             return false;
         }
         string json_data = File.ReadAllText(file_path);
-
-        if (_data_options == null)
-            _data_options = new JsonSerializerOptions();
-
-        PlayerProprietes player_data = JsonSerializer.Deserialize<PlayerProprietes>(json_data, _data_options)!;
+        
+        PlayerStats player_data = JsonSerializer.Deserialize<PlayerStats>(json_data, _data_options)!;
         if (player_data == null)
         {
             return false;
