@@ -278,14 +278,13 @@ class SaveManager
         if (_data_options == null)
             _data_options = new JsonSerializerOptions();
 
-        PlayerProprietes tmp = JsonSerializer.Deserialize<PlayerProprietes>(json_data, _data_options)!;
-        if (tmp == null)
+        PlayerProprietes player_data = JsonSerializer.Deserialize<PlayerProprietes>(json_data, _data_options)!;
+        if (player_data == null)
         {
             return false;
         }
 
-        _save_data.stamina = tmp.stamina;
-        _save_data.has_key = tmp.has_key;
+        _save_data = player_data;
         return true;
     }
 }
