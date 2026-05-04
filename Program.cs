@@ -1,8 +1,6 @@
 ﻿using System.Text.RegularExpressions;
 using System.Text.Json;
 
-using SaveManagerJsonKeys = (string stamina, string items);
-
 // 
 // Settings
 //
@@ -12,7 +10,7 @@ const string prompt = "cmd> ";
 const bool dev_mode = false;
 
 PlayerProprietes player_proprietes = new PlayerProprietes(100, false);
-SaveManager save_manager = new SaveManager(player_proprietes, null);
+SaveManager save_manager = new SaveManager(player_proprietes, new JsonSerializerOptions{ WriteIndented = true });
 
 if (args.Length == 1)
 {
@@ -21,12 +19,9 @@ if (args.Length == 1)
     if (!save_manager.LoadSave(file_path))
     {
         Console.WriteLine($"The save file '{saved_file}' dosen't exist in '{save_dir}' directory");
-        goto game_start;
+        return;
     }
 }
-
-
-game_start:
 
 Console.WriteLine("Security Game");
 
@@ -118,7 +113,7 @@ while (true)
         }
         Console.WriteLine("You recover 20% stamina.");
     }
-    else if (Regex.IsMatch(user_input, @"^save \w+\.json$"))
+    else if (Regex.IsMatch(user_input, @"^save \w+\.json"))
     {
         Console.WriteLine("Saving data...");
         string file_name = user_input.Split(" ")[1];
@@ -133,7 +128,7 @@ while (true)
         save_manager.SaveGame(file_name, save_dir);
         Console.WriteLine("Data Saved..");
     }
-    else if (Regex.IsMatch(user_input, @"^load \w+\.json$"))
+    else if (Regex.IsMatch(user_input, @"^load \w+\.json"))
     {
         Console.WriteLine("Loading data...");
         string file_name = user_input.Split(" ")[1];
@@ -244,16 +239,16 @@ class PlayerProprietes
 class SaveManager
 {
     PlayerProprietes _save_data;
-    SaveManagerJsonKeys _json_keys = ("stamina", "has_key");
+    JsonSerializerOptions _data_options;
 
-    public SaveManager(PlayerProprietes player_data, SaveManagerJsonKeys? json_keys)
+
+    public SaveManager(PlayerProprietes player_data, JsonSerializerOptions? data_options)
     {
-        this._save_data = player_data;
-        if (json_keys.HasValue)
-        {
-            this._json_keys = json_keys.Value;
-        }
+        _save_data = player_data;
+        if (data_options != null)
+            _data_options = data_options!;
     }
+
     public void SaveGame(string file_name, string file_dir)
     {
         if (!Directory.Exists(file_dir))
@@ -264,8 +259,10 @@ class SaveManager
         string file_path = $"{file_dir}/{file_name}";
 
         // For formathing 
-        var options = new JsonSerializerOptions { WriteIndented = true };
-        string json_data = JsonSerializer.Serialize(this._save_data, options);
+        if (_data_options == null)
+            _data_options = new JsonSerializerOptions();
+
+        string json_data = JsonSerializer.Serialize(_save_data, _data_options);
 
         File.WriteAllText(file_path, json_data);
     }
@@ -278,17 +275,12 @@ class SaveManager
         }
         string json_data = File.ReadAllText(file_path);
 
-        JsonElement json_data_element = JsonSerializer.Deserialize<JsonElement>(json_data);
+        if (_data_options == null)
+            _data_options = new JsonSerializerOptions();
 
-
-        PlayerProprietes tmp = new PlayerProprietes(0, false);
-        try 
+        PlayerProprietes tmp = JsonSerializer.Deserialize<PlayerProprietes>(json_data, _data_options)!;
+        if (tmp == null)
         {
-            tmp.stamina = json_data_element.GetProperty(_json_keys.stamina).GetInt16();
-            tmp.has_key = json_data_element.GetProperty(_json_keys.items).GetBoolean();
-        } catch (KeyNotFoundException e)
-        {
-            Console.WriteLine($"Save file is invalid because: {e.Data}");
             return false;
         }
 
