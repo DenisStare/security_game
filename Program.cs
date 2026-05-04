@@ -7,7 +7,6 @@ using System.Text.Json;
 
 const string save_dir = "./Saves";
 const string prompt = "cmd> ";
-const bool dev_mode = false;
 
 PlayerStats player = new PlayerStats();
 SaveManager save_manager = new SaveManager(player, new JsonSerializerOptions{ WriteIndented = true });
@@ -134,16 +133,9 @@ while (true)
     }
     else if (user_input == "stats")
     {
-        if (dev_mode)
-        {
-            Console.WriteLine("Stats: ");
-            Console.WriteLine($"\tStamina: {player.stamina}%");
-            Console.WriteLine($"\tHas Key: {player.items}");
-        }
-        else
-        {
-            Console.WriteLine("You are not an dev!");
-        }
+        Console.WriteLine("Stats: ");
+        Console.WriteLine($"\tStamina: {player.stamina}%");
+        Console.WriteLine($"\tHas Key: {player.items}");
     }
 }
 
@@ -241,7 +233,7 @@ class SaveManager
             return false;
         }
         string json_data = File.ReadAllText(file_path);
-        
+
         PlayerStats player_data = JsonSerializer.Deserialize<PlayerStats>(json_data, _data_options)!;
         if (player_data == null)
         {
