@@ -8,137 +8,9 @@ using System.Text.Json;
 const string save_dir = "./Saves";
 const string prompt = "cmd> ";
 
-PlayerStats player = new PlayerStats();
-SaveManager save_manager = new SaveManager(player, new JsonSerializerOptions{ WriteIndented = true });
-
-if (args.Length == 1)
-{
-    string saved_file = args[0];
-    string file_path = $"{save_dir}/{saved_file}";
-    if (!save_manager.LoadSave(file_path))
-    {
-        Console.WriteLine($"The save file '{saved_file}' dosen't exist in '{save_dir}' directory");
-        return;
-    }
-}
-
-Console.WriteLine("Security Game");
-
-// player needs 100% stamina and a key
-// if player types search it finds the key
-// if dosent have the key or stamina too low then it losses stamina
-
-
-Console.WriteLine("You are in a forest and you see a gate.");
-Console.WriteLine("On that door you see an sign.");
-Console.WriteLine("The sign says: 'You need 100% stamina and a key'.");
-Console.WriteLine("You have 100% stamina but you dont have an key.");
-Console.WriteLine("What do you do?");
-
-
-
-
-string user_input;
-
-Console.Write("\n");
-Console.WriteLine("Type 'exit' to exit.");
-
-while (true)
-{
-    Console.Write(prompt);
-    user_input = Console.ReadLine()!;
-
-    if (user_input == "exit")
-    {
-        return;
-    }
-    else if (user_input == "search" )
-    {
-        if (player.HasItem("key"))
-        {
-            Console.WriteLine("You have the key.");
-            continue;
-        }
-
-        Console.WriteLine("You see something in a bush.");
-        Console.WriteLine("You look in the bush and find the key.");
-
-        player.PickUpItem("hey");
-        Console.WriteLine("You put the key in your pocket.");
-    }
-    else if (user_input == "open gate")
-    {
-        Console.WriteLine("You try to open the gate.");
-        if (!player.HasItem("key"))
-        {
-            Console.WriteLine("You don't have the key.");
-            Console.WriteLine("But you try anyway.");
-            Console.WriteLine("The door won't open.");
-
-            player.LoseStamina(20);
-
-            Console.WriteLine("You lose 20% of your stamina.");
-            continue;
-        }
-        else if (player.stamina != 100)
-        {
-            Console.WriteLine("You dont have stamina.");
-            Console.WriteLine("But you try anyway");
-
-            player.LoseStamina(15);
-
-            Console.WriteLine("You lose 15% stamina.");
-            continue;
-        }
-
-        Console.WriteLine("You use the key.");
-        Console.WriteLine("The gate opens.");
-        Console.WriteLine("Game over!");
-        break;
-    }
-    else if (user_input == "rest")
-    {
-        Console.WriteLine("You rest.");
-        if (player.stamina == 100)
-        {
-            Console.WriteLine("You have 100% stamina");
-            continue;
-        }
-
-        player.AddStamina(20);
-
-        Console.WriteLine("You recover 20% stamina.");
-    }
-    else if (Regex.IsMatch(user_input, @"^save \w+\.json"))
-    {
-        Console.WriteLine("Saving data...");
-        string file_name = user_input.Split(" ")[1];
-
-        save_manager.SaveGame(file_name, save_dir);
-        Console.WriteLine("Data Saved..");
-    }
-    else if (Regex.IsMatch(user_input, @"^load \w+\.json"))
-    {
-        Console.WriteLine("Loading data...");
-        string file_name = user_input.Split(" ")[1];
-        string file_path = $"{save_dir}/{file_name}";
-
-        if (!save_manager.LoadSave(file_path))
-        {
-            Console.WriteLine($"The file '{file_name}' dosen't exist in '{save_dir}' directory");
-            continue;
-        }
-
-        Console.WriteLine("Data Loaded..");
-    }
-    else if (user_input == "stats")
-    {
-        Console.WriteLine("Stats: ");
-        Console.WriteLine($"\tStamina: {player.stamina}%");
-        Console.WriteLine($"\tHas Key: {player.items}");
-    }
-}
-
+Settings settings = new Settings(args, save_dir, prompt);
+GameManager game = new GameManager();
+game.GameLoop(settings);
 
 class PlayerStats
 {
@@ -202,14 +74,22 @@ class SaveManager
     PlayerStats _save_data;
     JsonSerializerOptions _data_options;
 
+    public SaveManager()
+    {
+        _save_data = new PlayerStats();
+        _data_options = new JsonSerializerOptions();
+    }
 
-    public SaveManager(PlayerStats player_data, JsonSerializerOptions? data_options)
+    public SaveManager(PlayerStats player_data, JsonSerializerOptions data_options)
     {
         _save_data = player_data;
-        if (data_options != null)
-            _data_options = data_options;
-        else
-            _data_options = new JsonSerializerOptions();
+        _data_options = data_options;
+    }
+
+    public SaveManager(PlayerStats player_data)
+    {
+        _save_data = player_data;
+        _data_options = new JsonSerializerOptions();
     }
 
     public void SaveGame(string file_name, string file_dir)
@@ -242,5 +122,223 @@ class SaveManager
 
         _save_data = player_data;
         return true;
+    }
+}
+
+class Settings
+{
+    public string save_dir = "";
+    public string[] args = [];
+
+    public string prompt = "";
+
+    public Settings(string[] args, string save_directory, string prompt)
+    {
+        this.args = args;
+        this.prompt = prompt;
+        save_dir = save_directory;
+    }
+}
+class GameManager
+{
+    string _user_input = "";
+    PlayerStats _player = new PlayerStats();
+    SaveManager _save_manager = new SaveManager();
+
+    public void GameLoop(Settings game_settings)
+    {
+        CheckForSaveFiles(game_settings);
+        PlayIntro(_player);
+
+        while (true)
+        {
+            try 
+            {
+                _user_input = GetUserInput(game_settings.prompt);
+            }
+            catch (Exception _)
+            {
+                Console.WriteLine("Go and type something player!");
+            }
+
+            if (_user_input == "exit")
+            {
+                Exit();
+            }
+            else if (_user_input == "search" )
+            {
+                Search(_player);
+            }
+            else if (_user_input == "open gate")
+            {
+                OpenGate(ref _player);
+            }
+            else if (_user_input == "rest")
+            {
+                Rest(_player);
+            }
+            else if (Regex.IsMatch(_user_input, @"^save \w+\.json"))
+            {
+                Save(_user_input, game_settings);
+            }
+            else if (Regex.IsMatch(_user_input, @"^load \w+\.json"))
+            {
+                Load(_user_input, game_settings);
+            }
+            else if (_user_input == "stats")
+            {
+                Stats(_player);
+            }
+        }
+    }
+
+    void PlayIntro(PlayerStats player)
+    {
+        Console.WriteLine("Security Game");
+
+        Console.WriteLine("You are in a forest and you see a gate.");
+        Console.WriteLine("On that door you see an sign.");
+        Console.WriteLine("The sign says: 'You need 100% stamina and a key'.");
+        Console.WriteLine($"You have {player.stamina} stamina but you dont have an key.");
+        Console.WriteLine("What do you do?");
+
+        Console.Write("\n");
+        Console.WriteLine("Type 'exit' to exit.");
+    }
+
+    string GetUserInput(string prompt)
+    {
+        Console.Write(prompt);
+        string user_input = Console.ReadLine()!;
+
+        if (user_input == null)
+        {
+            user_input = "";
+            throw new Exception("Invalid input!");
+        }
+        return user_input;
+
+    }
+
+    void CheckForSaveFiles(Settings info)
+    {
+        if (info.args.Length == 1)
+        {
+            string saved_file = info.args[0];
+            string file_path = $"{info.save_dir}/{saved_file}";
+            if (!_save_manager.LoadSave(file_path))
+            {
+                Console.WriteLine($"The save file '{saved_file}' dosen't exist in '{info.save_dir}' directory");
+                return;
+            }
+        }
+    }
+
+    void Search(PlayerStats player)
+    {
+        if (player.HasItem("key"))
+        {
+            Console.WriteLine("You have the key.");
+            return;
+        }
+
+        Console.WriteLine("You see something in a bush.");
+        Console.WriteLine("You look in the bush and find the key.");
+
+        player.PickUpItem("key");
+        Console.WriteLine("You put the key in your pocket.");
+    }
+
+    void OpenGate(ref PlayerStats player)
+    {
+        Console.WriteLine("You try to open the gate.");
+        if (!player.HasItem("key"))
+        {
+            Console.WriteLine("You don't have the key.");
+            Console.WriteLine("But you try anyway.");
+            Console.WriteLine("The door won't open.");
+
+            player.LoseStamina(20);
+
+            Console.WriteLine("You lose 20% of your stamina.");
+            return;
+        }
+        else if (player.stamina != 100)
+        {
+            Console.WriteLine("You dont have stamina.");
+            Console.WriteLine("But you try anyway");
+
+            player.LoseStamina(15);
+
+            Console.WriteLine("You lose 15% stamina.");
+            return;
+        }
+
+        Console.WriteLine("You use the key.");
+        Console.WriteLine("The gate opens.");
+        Console.WriteLine("Game over!");
+        Exit();
+    }
+
+    void Exit()
+    {
+        Environment.Exit(0);
+    }
+
+    void Rest(PlayerStats player)
+    {
+        Console.WriteLine("You rest.");
+        // TODO BUG: check if it has 100 stamina.
+        if (player.stamina == 100)
+        {
+            Console.WriteLine("You have 100% stamina");
+            return;
+        }
+
+        player.AddStamina(20);
+
+        Console.WriteLine("You recover 20% stamina.");
+    }
+
+    void Save(string input, Settings settings)
+    {
+        Console.WriteLine("Saving data...");
+        string file_name = input.Split(" ")[1];
+
+        _save_manager.SaveGame(file_name, settings.save_dir);
+        Console.WriteLine("Data Saved..");
+    }
+
+    void Load(string input, Settings settings)
+    {
+        Console.WriteLine("Loading data...");
+        string file_name = input.Split(" ")[1];
+        string file_path = $"{settings.save_dir}/{file_name}";
+
+        if (!_save_manager.LoadSave(file_path))
+        {
+            Console.WriteLine($"The file '{file_name}' dosen't exist in '{settings.save_dir}' directory");
+            return;
+        }
+
+        Console.WriteLine("Data Loaded..");
+    }
+
+    void Stats(PlayerStats player)
+    {
+        Console.WriteLine("Stats: ");
+        Console.WriteLine($"\tStamina: {player.stamina}%");
+
+        if (player.items.Count == 0)
+        {
+            Console.WriteLine("\tYou dont have items!");
+            return;
+        }
+
+        Console.WriteLine("\tItems: ");
+        foreach (string item in player.items)
+        {
+            Console.WriteLine("\t\t" + item);
+        }
     }
 }
