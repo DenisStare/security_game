@@ -9,7 +9,7 @@ const string save_dir = "./Saves";
 const string prompt = "cmd> ";
 const bool dev_mode = false;
 
-PlayerProprietes player_proprietes = new PlayerProprietes(100, false);
+PlayerProprietes player_proprietes = new PlayerProprietes();
 SaveManager save_manager = new SaveManager(player_proprietes, new JsonSerializerOptions{ WriteIndented = true });
 
 if (args.Length == 1)
@@ -29,11 +29,15 @@ Console.WriteLine("Security Game");
 // if player types search it finds the key
 // if dosent have the key or stamina too low then it losses stamina
 
+
 Console.WriteLine("You are in a forest and you see a gate.");
 Console.WriteLine("On that door you see an sign.");
 Console.WriteLine("The sign says: 'You need 100% stamina and a key'.");
 Console.WriteLine("You have 100% stamina but you dont have an key.");
 Console.WriteLine("What do you do?");
+
+
+
 
 string user_input;
 
@@ -51,7 +55,7 @@ while (true)
     }
     else if (user_input == "search" )
     {
-        if (player_proprietes.HasItem())
+        if (player_proprietes.HasItem("key"))
         {
             Console.WriteLine("You have the key.");
             continue;
@@ -60,24 +64,19 @@ while (true)
         Console.WriteLine("You see something in a bush.");
         Console.WriteLine("You look in the bush and find the key.");
 
-        player_proprietes.PickUpItem();
+        player_proprietes.PickUpItem("hey");
         Console.WriteLine("You put the key in your pocket.");
     }
     else if (user_input == "open gate")
     {
         Console.WriteLine("You try to open the gate.");
-        if (!player_proprietes.HasItems())
+        if (!player_proprietes.HasItem("key"))
         {
             Console.WriteLine("You don't have the key.");
             Console.WriteLine("But you try anyway.");
             Console.WriteLine("The door won't open.");
 
-            if (player_proprietes.LoseStamina(20))
-            {
-                Console.WriteLine("You have 0 stamina.");
-                Console.WriteLine("You die!");
-                break;
-            }
+            player_proprietes.LoseStamina(20);
 
             Console.WriteLine("You lose 20% of your stamina.");
             continue;
@@ -87,12 +86,7 @@ while (true)
             Console.WriteLine("You dont have stamina.");
             Console.WriteLine("But you try anyway");
 
-            if (player_proprietes.LoseStamina(15))
-            {
-                Console.WriteLine("You have 0 stamina.");
-                Console.WriteLine("You die!");
-                break;
-            }
+            player_proprietes.LoseStamina(15);
 
             Console.WriteLine("You lose 15% stamina.");
             continue;
@@ -106,24 +100,20 @@ while (true)
     else if (user_input == "rest")
     {
         Console.WriteLine("You rest.");
-        if (player_proprietes.AddStamina(20))
+        if (player_proprietes.stamina == 100)
         {
-            Console.WriteLine("You have 100% stamina.");
+            Console.WriteLine("You have 100% stamina");
             continue;
         }
+
+        player_proprietes.AddStamina(20);
+
         Console.WriteLine("You recover 20% stamina.");
     }
     else if (Regex.IsMatch(user_input, @"^save \w+\.json"))
     {
         Console.WriteLine("Saving data...");
         string file_name = user_input.Split(" ")[1];
-
-        // Save date
-        var save_data = new
-        {
-            stamina = player_proprietes.stamina,
-            hasKey = player_proprietes.has_key,
-        };
 
         save_manager.SaveGame(file_name, save_dir);
         Console.WriteLine("Data Saved..");
@@ -148,7 +138,7 @@ while (true)
         {
             Console.WriteLine("Stats: ");
             Console.WriteLine($"\tStamina: {player_proprietes.stamina}%");
-            Console.WriteLine($"\tHas Key: {player_proprietes.has_key}");
+            Console.WriteLine($"\tHas Key: {player_proprietes.items}");
         }
         else
         {
@@ -160,79 +150,58 @@ while (true)
 
 class PlayerProprietes
 {
-    short _stamina;
-    bool _has_key;
+    public short stamina = 100;
+    public List<string> items = new();
 
-    public short stamina
+    public short LoseStamina(short to_lose)
     {
-        get
+        this.stamina = (short)Math.Max(stamina - to_lose, 0);
+        if (this.stamina == 0)
         {
-            return _stamina;
+            GameOver();
+            return -1;
         }
-        set
-        {
-            _stamina = value;
-        }
+
+        return this.stamina;
     }
 
-    public bool has_key
+    public short AddStamina(short to_add)
     {
-        get
-        {
-            return _has_key;
-        }
-        set
-        {
-            _has_key = value;
-        }
+        this.stamina = (short)Math.Min(stamina + to_add, 100);
+        return this.stamina;
     }
 
-    public PlayerProprietes(short stamina, bool has_key)
+    public void PickUpItem(string new_item)
     {
-        this._stamina = stamina;
-        this._has_key = has_key;
+        this.items.Add(new_item);
     }
 
-    public bool LoseStamina(short to_lose)
+    public bool HasItem(string item) // Todo: for one item
     {
-        short last_stamina = this._stamina;
-        _stamina -= to_lose;
-
-        if (_stamina <= 0)
+        if (this.items.Contains(item))
         {
-            _stamina = last_stamina;
             return true;
         }
         return false;
     }
 
-    public bool AddStamina(short to_add)
+    public bool HasItems(string[] items)
     {
-        short last_stamina = _stamina;
-        _stamina += to_add;
-        if (_stamina > 100)
+        foreach (string item in items)
         {
-            _stamina = last_stamina;
-            return true;
+            if (!this.HasItem(item))
+            {
+                return false;
+            }
         }
-        return false;
+        return true;
     }
 
-    public void PickUpItem() // for now a key
+    public void GameOver()
     {
-        _has_key = true;
+        Console.WriteLine("You have 0% stamina. You die.");
+        Environment.Exit(3);
     }
-
-    public bool HasItem() // Todo: for one item
-    {
-        return _has_key;
-    }
-
-    public bool HasItems() // for multiple item
-    {
-        return _has_key;
-    }
-
 };
 
 
