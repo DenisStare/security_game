@@ -71,28 +71,20 @@ class PlayerStats
 
 class SaveManager
 {
-    PlayerStats _save_data;
     JsonSerializerOptions _data_options;
 
     public SaveManager()
     {
-        _save_data = new PlayerStats();
-        _data_options = new JsonSerializerOptions();
+        _data_options = new JsonSerializerOptions { WriteIndented = true, IncludeFields = true};
     }
 
-    public SaveManager(PlayerStats player_data, JsonSerializerOptions data_options)
+    public SaveManager(JsonSerializerOptions data_options)
     {
-        _save_data = player_data;
+
         _data_options = data_options;
     }
 
-    public SaveManager(PlayerStats player_data)
-    {
-        _save_data = player_data;
-        _data_options = new JsonSerializerOptions();
-    }
-
-    public void SaveGame(string file_name, string file_dir)
+    public void SaveGame(ref PlayerStats to_save, string file_name, string file_dir)
     {
         if (!Directory.Exists(file_dir))
         {
@@ -101,12 +93,12 @@ class SaveManager
 
         string file_path = $"{file_dir}/{file_name}";
 
-        string json_data = JsonSerializer.Serialize(_save_data, _data_options);
+        string json_data = JsonSerializer.Serialize(to_save, _data_options);
 
         File.WriteAllText(file_path, json_data);
     }
 
-    public bool LoadSave(string file_path)
+    public bool LoadSave(ref PlayerStats to_load, string file_path)
     {
         if (!File.Exists(file_path))
         {
@@ -120,7 +112,7 @@ class SaveManager
             return false;
         }
 
-        _save_data = player_data;
+        to_load = player_data;
         return true;
     }
 }
@@ -171,7 +163,7 @@ class GameManager
             }
             else if (_user_input == "open gate")
             {
-                OpenGate(ref _player);
+                OpenGate();
             }
             else if (_user_input == "rest")
             {
@@ -226,7 +218,7 @@ class GameManager
         {
             string saved_file = info.args[0];
             string file_path = $"{info.save_dir}/{saved_file}";
-            if (!_save_manager.LoadSave(file_path))
+            if (!_save_manager.LoadSave(ref _player, file_path))
             {
                 Console.WriteLine($"The save file '{saved_file}' dosen't exist in '{info.save_dir}' directory");
                 return;
@@ -249,26 +241,26 @@ class GameManager
         Console.WriteLine("You put the key in your pocket.");
     }
 
-    void OpenGate(ref PlayerStats player)
+    void OpenGate()
     {
         Console.WriteLine("You try to open the gate.");
-        if (!player.HasItem("key"))
+        if (!_player.HasItem("key"))
         {
             Console.WriteLine("You don't have the key.");
             Console.WriteLine("But you try anyway.");
             Console.WriteLine("The door won't open.");
 
-            player.LoseStamina(20);
+            _player.LoseStamina(20);
 
             Console.WriteLine("You lose 20% of your stamina.");
             return;
         }
-        else if (player.stamina != 100)
+        else if (_player.stamina != 100)
         {
             Console.WriteLine("You dont have stamina.");
             Console.WriteLine("But you try anyway");
 
-            player.LoseStamina(15);
+            _player.LoseStamina(15);
 
             Console.WriteLine("You lose 15% stamina.");
             return;
@@ -303,19 +295,31 @@ class GameManager
     void Save(string input, Settings settings)
     {
         Console.WriteLine("Saving data...");
-        string file_name = input.Split(" ")[1];
+        string[] parts = input.Split(" ");
+        if (parts.Length > 2)
+        {
+            Console.WriteLine("Please put the path.");
+        }
+        string file_name = parts[1];
 
-        _save_manager.SaveGame(file_name, settings.save_dir);
+        _save_manager.SaveGame(ref _player, file_name, settings.save_dir);
         Console.WriteLine("Data Saved..");
     }
 
     void Load(string input, Settings settings)
     {
         Console.WriteLine("Loading data...");
-        string file_name = input.Split(" ")[1];
+        string[] parts = input.Split(" ");
+        if (parts.Length > 2)
+        {
+            Console.WriteLine("Please put the path.");
+            return;
+        }
+        string file_name = parts[1];
+
         string file_path = $"{settings.save_dir}/{file_name}";
 
-        if (!_save_manager.LoadSave(file_path))
+        if (!_save_manager.LoadSave(ref _player, file_path))
         {
             Console.WriteLine($"The file '{file_name}' dosen't exist in '{settings.save_dir}' directory");
             return;
